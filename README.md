@@ -44,18 +44,18 @@ Projectlombok.org/download
 체크목록
 
 -Developer Tools
-	-Spring Boot DevTools (파일이 프로젝트 내에서 체인지 될 때, 변경이 일어났으니 자동 재시작)
-	-Lombok(게터세터, 생성자를 어노테이션을 통해 자동으로 생성해주는 라이브러리)
+  -Spring Boot DevTools (파일이 프로젝트 내에서 체인지 될 때, 변경이 일어났으니 자동 재시작)
+  -Lombok(게터세터, 생성자를 어노테이션을 통해 자동으로 생성해주는 라이브러리)
 	
 -SQL
-	-Spring Data JPA(데이터베이스를 JPA를 통해 만듦 = ORM)
-	MySQL Driver
+  -Spring Data JPA(데이터베이스를 JPA를 통해 만듦 = ORM)
+  MySQL Driver
 	
 -Security
-	-Spring Security(보안 기능에 대한 라이브러리)
+  -Spring Security(보안 기능에 대한 라이브러리)
 	
 -Web
-	-Spring Web(어노테이션을 쓰기 위해서 체크함, 내장형 컨테이너로 톰캣을 기본 탑재)
+  -Spring Web(어노테이션을 쓰기 위해서 체크함, 내장형 컨테이너로 톰캣을 기본 탑재)
 	
 ![image](https://user-images.githubusercontent.com/86938974/166133959-26fed241-57bc-48fd-8141-c58e20255551.png)
 
