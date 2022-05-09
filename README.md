@@ -1,11 +1,11 @@
 # Springboot-JPA-Blog
 
 * 환경세팅
-- Oracle JDK 1.8
-- MySQL 5.7
+	- Oracle JDK 1.8
+	- MySQL 5.7
 MySQL Workbench 실행 -> 접속
 ![image](https://user-images.githubusercontent.com/86938974/166133310-bb4c5e46-d804-4bdf-ad6f-b5fcd7b68422.png)
-- Spring Tools 4.11.0
+	- Spring Tools 4.11.0
 ![image](https://user-images.githubusercontent.com/86938974/166133396-ae6e96a3-b753-4629-a752-cb05f30d6687.png)
 ![image](https://user-images.githubusercontent.com/86938974/166133425-71cdc6d3-3ce6-4135-86b8-75c84ce39aef.png)
 
@@ -37,25 +37,25 @@ CSS,HTML,JSP Files Encoding도 UTF-8로 변경
 Projectlombok.org/download
 다운로드 폴더 -> git bash here -> java -jar lombok.jar
 
-*의존성 설정
+* 의존성 설정
 
 ![image](https://user-images.githubusercontent.com/86938974/166133777-6e7d5653-ab2b-4301-bc11-b48198161cf4.png)
 
 체크목록
 
--Developer Tools
-  -Spring Boot DevTools (파일이 프로젝트 내에서 체인지 될 때, 변경이 일어났으니 자동 재시작)
-  -Lombok(게터세터, 생성자를 어노테이션을 통해 자동으로 생성해주는 라이브러리)
+- Developer Tools
+  - Spring Boot DevTools (파일이 프로젝트 내에서 체인지 될 때, 변경이 일어났으니 자동 재시작)
+  - Lombok(게터세터, 생성자를 어노테이션을 통해 자동으로 생성해주는 라이브러리)
 	
--SQL
-  -Spring Data JPA(데이터베이스를 JPA를 통해 만듦 = ORM)
+- SQL
+  - Spring Data JPA(데이터베이스를 JPA를 통해 만듦 = ORM)
   MySQL Driver
 	
--Security
-  -Spring Security(보안 기능에 대한 라이브러리)
+- Security
+  - Spring Security(보안 기능에 대한 라이브러리)
 	
--Web
-  -Spring Web(어노테이션을 쓰기 위해서 체크함, 내장형 컨테이너로 톰캣을 기본 탑재)
+- Web
+  - Spring Web(어노테이션을 쓰기 위해서 체크함, 내장형 컨테이너로 톰캣을 기본 탑재)
 	
 ![image](https://user-images.githubusercontent.com/86938974/166133959-26fed241-57bc-48fd-8141-c58e20255551.png)
 
