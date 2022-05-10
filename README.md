@@ -356,18 +356,18 @@ public class User {
 	
 }
 ```
-@Entity : 테이블화 시킴( User 클래스가 스프링부트가 실행될 때 MySQL에 테이블이 생성이 된다. )
-@Id : Primary Key
-@GeneratedValue(strategy = GenerationType.IDENTITY) : 프로젝트에서 연결된 DB의 넘버링 전략을 따라간다. MySQL이므로 auto_increment 전략을 따라감.
-application의 JPA 설정에서 use-new-id-generator-mappings:false를 해줬으므로 JPA의 전략을 사용하지 않는다. 
-@Column(nullable=false, length = 30) : null허용x , 길이 30자
-@CreationTimestamp : 시간이 자동 입력
-@ColumnDefault : default값 설정
-id와 createDate는 자동 입력이다.
-id는 시퀀스, auto_increment 전략을 사용
-username : 아이디
-password : 비밀번호
-email : 이메일 주소
+- @Entity : 테이블화 시킴( User 클래스가 스프링부트가 실행될 때 MySQL에 테이블이 생성이 된다. )
+- @Id : Primary Key
+- @GeneratedValue(strategy = GenerationType.IDENTITY) : 프로젝트에서 연결된 DB의 넘버링 전략을 따라간다. MySQL이므로 auto_increment 전략을 따라감.
+- application의 JPA 설정에서 use-new-id-generator-mappings:false를 해줬으므로 JPA의 전략을 사용하지 않는다. 
+- @Column(nullable=false, length = 30) : null허용x , 길이 30자
+- @CreationTimestamp : 시간이 자동 입력
+- @ColumnDefault : default값 설정
+- id와 createDate는 자동 입력이다.
+- id는 시퀀스, auto_increment 전략을 사용
+- username : 아이디
+- password : 비밀번호
+- email : 이메일 주소
 
 	* ddl-auto를 create로, show-sql을 true로 설정하면 프로젝트 실행마다 다음과 같이 테이블을 만든다.
 ![image](https://user-images.githubusercontent.com/86938974/167650362-54b2c580-6011-4ebb-9215-b7afa0932dfc.png)
