@@ -224,6 +224,167 @@ public Member(int id, String username, String password, String email) {
 		return "lombok test 완료";
 	}
 ```
+* yaml
+	* 스프링은 포트, DB 연결, 인코딩 등 전반적인 설정을 yaml파일에서 한다..
+	* key와 value사이엔 한 칸 띄어져야 한다
+	* 중괄호가 없이 들여쓰기가 되어 있음(스페이스 두 칸)
+	* 이러한 이유로 Json보다 가볍다
+	* 스프링에서는 이 사항들을 application.yml에 저장
+
+![image](https://user-images.githubusercontent.com/86938974/167644837-74c76de5-e7c4-412c-a5c7-4def3d80924b.png)
+	* 스프링이 실행하기 직전에 이 파일을 읽는다.
+```
+* 포트 안에 context 설정 : 기본 주소를 localhost:8000/ 으로 지정
+server:
+  port: 8000
+  servlet:
+    context-path: /
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+    
+spring:
+  mvc:
+    view:
+      prefix: /WEB-INF/views/
+      suffix: .jsp
+      
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/blog?serverTimezone=Asia/Seoul
+    username: cos
+    password: cos1234
+    
+  jpa:
+    open-in-view: true
+    hibernate:
+      ddl-auto: update
+      naming:
+        physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
+      use-new-id-generator-mappings: false
+    show-sql: true
+    properties:
+      hibernate.format_sql: true
+
+  jackson:
+    serialization:
+      fail-on-empty-beans: false
+      
+cos:
+  key: cos1234
+
+```
+	* physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
+=> 테이블을 만들 때 스프링에서의 변수명 그대로 만들어준다.
+	* jpa의 ddl-auto : create --> 스프링 프로젝트 실행시 항상 테이블을 새로 만듦, 처음 이후엔 update로 바꿔줘야함 
+	* Controller는 파일을 리턴할 때 쓴다. 파일리턴의 기본 경로는 src/main//resources/static이다.
+	* 리턴명 : /home.html 을 해줘야
+	* src/main//resources/static/home.html을 찾을 수 있다.
+	
+![image](https://user-images.githubusercontent.com/86938974/167646550-c159dd69-907d-4855-bebd-a89d5e97d447.png)
+	* static 폴더는 정적 파일만 인식 가능 -> 이미지 등, jsp는 못 찾는다.
+	* 그래서 다음과 같이 prefix와 suffix를 지정해준다. 
+```
+spring:
+  mvc:
+    view:
+      prefix: /WEB-INF/views/
+      suffix: .jsp
+```
+![image](https://user-images.githubusercontent.com/86938974/167647279-6d87ceca-5cb5-4277-961b-49642abee658.png)
+	* 다음과 같이 매핑하면 됨 (prefix와 suffix를 이용)	
+![image](https://user-images.githubusercontent.com/86938974/167647369-98d90c11-99c2-4f10-a097-4277233d777a.png)
+
+* JPA이용 테이블 생성 Blog 테이블 만들기(User, Board, Reply)
+	* model 패키지 생성 
+![image](https://user-images.githubusercontent.com/86938974/167647817-421b1752-6288-42a5-82e3-eb67d612689a.png)
+	* User, Board, Reply 생성
+![image](https://user-images.githubusercontent.com/86938974/167647910-0334c5a5-7ee7-481a-bc9c-8b3aba9dcf96.png)
+
+```
+package com.cos.blog.model;
+
+import java.sql.Timestamp;
+
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.EnumType;
+import javax.persistence.Enumerated;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+
+import org.hibernate.annotations.CreationTimestamp;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+
+//ORM -> Java(다른언어) Object -> 테이블로 매핑해주는 기술
+//테이블로 만들기 위해
+@Entity //User 클래스가 MySQL에 테이블이 생성이 된다.
+@Data // Getter와 Setter가 다 있다.
+@NoArgsConstructor //빈 생성자
+@AllArgsConstructor //전체 생성자
+@Builder //빌더패턴
+//@DynamicInsert // insert시에 null인 필드를 제외시킨다. Default값에 null이 들어가는 것을 방지, Default가 그대로 생성 된다.
+public class User {
+	 
+	@Id //Primary Key
+	@GeneratedValue(strategy = GenerationType.IDENTITY) // 프로젝트에서 연결된 DB의 넘버링 전략을 따라간다.
+	private int id; //시퀀스, auto_increment, 자동 입력
+	
+	@Column(nullable = false, length = 100, unique = true)
+	private String username; //아이디
+	
+	@Column(nullable = false, length = 100) //123456 => 해쉬(비밀번호 암호화)
+	private String password;
+	
+	@Column(nullable = false, length = 50)
+	private String email;
+	
+	//	@ColumnDefault("user")
+	// DB는 RoleType이라는게 없다.
+	@Enumerated(EnumType.STRING)
+	private RoleType role; //Enum을 쓰는게 좋다. // ADMIN, USER 도메인 설정하여 실수 방지
+	
+	@CreationTimestamp //시간이 자동 입력
+	private Timestamp createDate;
+	
+}
+```
+@Entity : 테이블화 시킴( User 클래스가 스프링부트가 실행될 때 MySQL에 테이블이 생성이 된다. )
+@Id : Primary Key
+@GeneratedValue(strategy = GenerationType.IDENTITY) : 프로젝트에서 연결된 DB의 넘버링 전략을 따라간다. MySQL이므로 auto_increment 전략을 따라감.
+application의 JPA 설정에서 use-new-id-generator-mappings:false를 해줬으므로 JPA의 전략을 사용하지 않는다. 
+@Column(nullable=false, length = 30) : null허용x , 길이 30자
+@CreationTimestamp : 시간이 자동 입력
+@ColumnDefault : default값 설정
+id와 createDate는 자동 입력이다.
+id는 시퀀스, auto_increment 전략을 사용
+username : 아이디
+password : 비밀번호
+email : 이메일 주소
+
+	* ddl-auto를 create로, show-sql을 true로 설정하면 프로젝트 실행마다 다음과 같이 테이블을 만든다.
+![image](https://user-images.githubusercontent.com/86938974/167650362-54b2c580-6011-4ebb-9215-b7afa0932dfc.png)
+
+	* 다음과 같이 테이블이 만들어진 것을 확인할 수 있다.
+![image](https://user-images.githubusercontent.com/86938974/167651006-ac366067-fc1e-4f50-bef8-736485958743.png)
+	* JPA는 ORM이기 때문에 java에 있는 오브젝트를 테이블로 매핑해준다. => 사용자는 오브젝트만 만들면 됨
+	* 즉 다음과 같이 수정하고 저장하면 쿼리가 다시 실행되는데,
+![image](https://user-images.githubusercontent.com/86938974/167651300-cf17f543-4936-45c3-8f2e-2be0881ddc0d.png)
+	* MySQL에서 바로 확인해보면 다음과 같이 em이 바뀐다. JPA가 내가 만든 오브젝트를 테이블로 매핑해주는 ORM 이기때문
+![image](https://user-images.githubusercontent.com/86938974/167651369-4b543484-caeb-4b67-b038-f9f2eea3319e.png)
+
+
+
+
+
+
 
 
 
