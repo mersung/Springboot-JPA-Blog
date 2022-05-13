@@ -351,6 +351,8 @@ public class User {
 	@Enumerated(EnumType.STRING)
 	private RoleType role; //Enum을 쓰는게 좋다. // ADMIN, USER 도메인 설정하여 실수 방지
 	
+	private String oauth; //카카오, 구글 , 어디로 로그인 했는지
+	
 	@CreationTimestamp //시간이 자동 입력
 	private Timestamp createDate;
 	
@@ -380,10 +382,497 @@ public class User {
 	* MySQL에서 바로 확인해보면 다음과 같이 em이 바뀐다. JPA가 내가 만든 오브젝트를 테이블로 매핑해주는 ORM 이기때문
 ![image](https://user-images.githubusercontent.com/86938974/167651369-4b543484-caeb-4b67-b038-f9f2eea3319e.png)
 
+	* Board 테이블 생성
+![image](https://user-images.githubusercontent.com/86938974/168274620-503e755a-151c-4194-9096-82da2fce8cc9.png)
+```
+package com.cos.blog.model;
+
+import java.sql.Timestamp;
+import java.util.List;
+
+import javax.persistence.CascadeType;
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.FetchType;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.JoinColumn;
+import javax.persistence.Lob;
+import javax.persistence.ManyToOne;
+import javax.persistence.OneToMany;
+import javax.persistence.OrderBy;
+
+import org.hibernate.annotations.CreationTimestamp;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+
+
+@Data //getter setter가 다 생성됨
+@NoArgsConstructor //빈 생성자
+@AllArgsConstructor //전체 생성자
+@Builder
+@Entity //데이터베이스에 매핑을 시켜주는 ORM클래스이다.
+public class Board {
+
+	@Id
+	@GeneratedValue(strategy = GenerationType.IDENTITY) // auto_increment
+	private int id;
+	
+	@Column(nullable = false, length = 100)
+	private String title;
+	
+	@Lob //대용량 데이터 쓸때 사용
+	private String content; //섬머노트 라이브러리 <html>태그가 섞여서 디자인이 됨.
+	
+	//	@ColumnDefault("0")
+	private int count; //조회수
+	
+	//얘도 외래키 이므로 JPA에 의해 자동으로 Join
+	//fetch = FetchType.EAGER = Board테이블을 셀렉트하면, user	정보를 가져올게, 한 건 밖에 없으니 (reply와는 다르게)
+	//fetch타입이 EAGER이면 무조건 들고와야 하는 정보다. 즉 외래키이면서 게시글은 UserId가 꼭 필요하다. 작성자 이므로, 그래서 EAGER로 꼭 들고와준다.
+	@ManyToOne(fetch = FetchType.EAGER) //Board가 Many고, User가 One이라는 뜻 = 한 명의 유저는 여러개의 게시글을 쓸 수 있다는 뜻
+	@JoinColumn(name="userId") // 필드 값은 userId라고 만들어짐
+	private User user; //DB는 오브젝트를 저장할 수 없다. FK, 자바는 오브젝트를 저장할 수 있다. 그래서 자바에서 데이터베이스 형태에 맞춰야함
+	// User객체를 자동으로 참조함
+	
+	//Board를 셀렉트하면, 	reply정보를 필요하면 가져올게 여러 건 있으니, LAZY전략
+	//	오로지 Board테이블에 select할 때, 조인해서 값만 넣어주기 위해 reply를 불러온것
+//	@OneToMany(mappedBy = "board", fetch=FetchType.LAZY) // 하나의 Board와 여러개의 Reply
+	//mappedBy = 연관관계의 주인이 아니다.(FK가 아니다.)DB에 칼럼을 만들지 마세요.
+	//	@JoinColumn(name="replyId") 조인컬럼은 필요가 없다. 한 개의 게시글 id에 여러개 Reply가 달릴 경우, 제1 정규화가 깨진다. 필요없음
+	//JPA에 의해 쿼리문을 DB에 날리면 자동으로 Board가 가진 외래키들을 Join해준다.
+//	private List<Reply> reply; //reply는 한 개의 Board에 여러 개 달릴 수 있으므로 List형태로 지정
+
+	//만약 댓글 불러오기 기능을 하나 만들고 누르면 댓글을 불러온다면, EAGER방식으로 댓글버튼 하나는 꼭 가져온다.
+	@OneToMany(mappedBy="board",fetch=FetchType.EAGER, cascade = CascadeType.REMOVE) //보드를 지울 때 댓글을 다 지움
+	@JsonIgnoreProperties({"board"}) //Reply에서 호출을 또 하게 될 때 board는 getter호출이 안 된다 => 무한참조 방지
+	@OrderBy("id desc")//아이디 값으로 내림차순 정렬해줌
+	private List<Reply>replys;
+	
+	@CreationTimestamp //자동으로 값 생성
+	private Timestamp createDate;
+	
+	
+}
+
+
+```
+- 다음과 같이 생성 확인
+![image](https://user-images.githubusercontent.com/86938974/168276449-94b9b379-ff43-473b-8fb7-ad23cf38a988.png)
+![image](https://user-images.githubusercontent.com/86938974/168276495-a8786d50-3852-4d07-8349-d3fec3ea7012.png)
+
+
+
+	* Reply 테이블 생성
+```
+package com.cos.blog.model;
+
+import java.sql.Timestamp;
+
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.JoinColumn;
+import javax.persistence.ManyToOne;
+
+import org.hibernate.annotations.CreationTimestamp;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
+@Data
+@Entity
+public class Reply {
+		
+	@Id
+	@GeneratedValue(strategy = GenerationType.IDENTITY) // 프로젝트에서 연결된 DB의 넘버링 전략을 따라간다.
+	private int id; //시퀀스, auto_increment
+	
+	@Column(nullable = false, length = 200)
+	private String content;
+	
+	@ManyToOne //여러개의 답변은 하나의 보드(게시글)과 연결된다.
+	@JoinColumn(name="boardId") //boardId 컬럼 생성 후 Board를 참조
+	private Board board; //Board를 참조
+	
+	@ManyToOne //여러개의 답변은 하나의 유저가 쓸 수 있다.
+	@JoinColumn(name="userId")
+	private User user; //답변을 누가 적었는지도 알아야해서 User를 참조
+	
+	@CreationTimestamp
+	private Timestamp createDate;
+
+//	@Override
+//	public String toString() {
+//		return "Reply [id=" + id + ", content=" + content + ", board=" + board + ", user=" + user + ", createDate="
+//				+ createDate + "]";
+//	}
+//	
+	
+
+//	public void update(User user, Board board, String content) {
+//		setUser(user);
+//		setBoard(board);
+//		setContent(content);
+//	}
+}
+
+```
+- 다음과 같이 생성됨
+![image](https://user-images.githubusercontent.com/86938974/168276706-bc0e369e-4e0f-482f-8944-107bf330feb2.png)
+
+![image](https://user-images.githubusercontent.com/86938974/168276678-e04a295e-6839-43cb-9279-84ada0fbdd59.png)
+
+	* Enum 지정
+- Role의 범위를 지정해준다.
+![image](https://user-images.githubusercontent.com/86938974/168279950-f948c488-c112-4521-8017-7b20f7800e9a.png)
+
+```
+package com.cos.blog.model;
+
+public enum RoleType {
+	USER, ADMIN
+}
+
+```
+
+
+* Repository (DAO 생성)
+	* UserRepository 생성
+```
+package com.cos.blog.repository;
+
+import java.util.Optional;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import com.cos.blog.model.User;
+
+//해당 JpaRepository는 User테이블이 관리하는 Repository이며, User테이블의 PK는 Integer이다.
+//JSP로 따지면 DAO라고 생각하면 됨(JpaRepository를 상속 받았으므로)
+//자동으로 bean 등록이 된다.
+//@Repository 생략 가능
+public interface UserRepository extends JpaRepository<User, Integer>{
+
+}
+```
+
+	* Exception 처리하기
+![image](https://user-images.githubusercontent.com/86938974/168285418-c8f8f194-a2e3-4471-9bbf-e21b64746ed5.png)
+
+```
+package com.cos.blog.handler;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.ControllerAdvice;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.cos.blog.dto.ResponseDto;
+
+@ControllerAdvice //모든 예외가 발생시 여기로 들어옴
+@RestController
+public class GlobalExceptionHandler {
+
+	@ExceptionHandler(value = IllegalArgumentException.class)
+	public String handleArgumentException(IllegalArgumentException e) {
+		return "<h1>"+e.getMessage()+"</h1>";
+	}
+}
+```
+
+* 메인화면 만들기
+	* 부트스트랩 사용
+	* 다음과 같이 index.jsp, UserController, BoardController 생성
+![image](https://user-images.githubusercontent.com/86938974/168287712-adb43842-1c94-474e-b977-5541530b6ac9.png)
+
+![image](https://user-images.githubusercontent.com/86938974/168287941-183fe05d-9f70-4d66-a37b-1b2b617b8c46.png)
+
+
+![image](https://user-images.githubusercontent.com/86938974/168287873-6c3fc9df-2940-4ccb-a6f3-13302b950720.png)
+
+
+	* index.jsp 코드
+```
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<%@ include file="layout/header.jsp"%>
+
+
+<!-- 
+request 정보가 넘어올때 BoardController의
+model.addAttribute에서 설정한 boards가 넘어온다.
+ items에서 boards를 받아 한 건씩 board라는 변수에 저장
+  -->
+<c:forEach var="board" items="${boards.content}">
+	<div class="container">
+		<div class="card m-2">
+			<div class="card-body">
+				<!-- $표시 후 board.title을 호출하면 board의 getter가 호출되어 title을 가져온다 -->
+				<h4 class="card-title">${board.title}</h4>
+				<a href="/board/${board.id }" class="btn btn-primary">상세보기</a>
+			</div>
+		</div>
+	</div>
+</c:forEach>
+<div>
+	<ul class="pagination justify-content-center">
+		<c:choose>
+			<c:when test="${boards.first}">
+				<li class="page-item disabled"><a class="page-link" href="?page=${boards.number-1 }">Previous</a></li>
+			</c:when>
+			<c:otherwise>
+				<li class="page-item "><a class="page-link" href="?page=${boards.number-1 }">Previous</a></li>
+			</c:otherwise>
+		</c:choose>
+
+		<c:choose>
+			<c:when test="${boards.last}">
+				<li class="page-item disabled"><a class="page-link" href="?page=${boards.number+1 }">Next</a></li>
+			</c:when>
+			<c:otherwise>
+				<li class="page-item"><a class="page-link" href="?page=${boards.number+1 }">Next</a></li>
+			</c:otherwise>
+		</c:choose>
+	</ul>
+</div>
 
 
 
 
+
+
+
+<%@ include file="layout/footer.jsp"%>
+
+```
+	* index.jsp는 상단과 하단에 따로 만들어놓은 footer.jsp와 header.jsp를 include 해준다.
+	* 다음은 footer와 header.jsp
+```
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<br />
+<div class="jumbotron text-center" style="margin-bottom: 0">
+	<p>Created by 심대성</p>
+	<p>📞 010-4799-5309</p>
+	<p>🏴 인천광역시 서구 가정동</p>
+</div>
+</body>
+</html>
+```
+
+```
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core"%>
+<%@ taglib prefix="sec" uri="http://www.springframework.org/security/tags"%>
+
+<!-- 인증이 되었는지 확인 -->
+<sec:authorize access="isAuthenticated()">
+	<!-- principal = current user object에게 direct access를 허용 -->
+	<sec:authentication property="principal" var="principal" />
+</sec:authorize>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>심대성의 스프링부트 블로그</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.1/dist/css/bootstrap.min.css">
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.1/dist/js/bootstrap.bundle.min.js"></script>
+<link href="https://cdn.jsdelivr.net/npm/summernote@0.8.18/dist/summernote-bs4.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/summernote@0.8.18/dist/summernote-bs4.min.js"></script>
+
+</head>
+<body>
+
+	<nav class="navbar navbar-expand-md bg-dark navbar-dark">
+		<a class="navbar-brand" href="/">홈</a>
+		<button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#collapsibleNavbar">
+			<span class="navbar-toggler-icon"></span>
+		</button>
+		<div class="collapse navbar-collapse" id="collapsibleNavbar">
+
+			<c:choose>
+				<c:when test="${empty principal }">
+					<ul class="navbar-nav">
+						<li class="nav-item"><a class="nav-link" href="/auth/loginForm">로그인</a></li>
+						<li class="nav-item"><a class="nav-link" href="/auth/joinForm">회원가입</a></li>
+					</ul>
+				</c:when>
+				<c:otherwise>
+					<ul class="navbar-nav">
+						<!-- 아래는 /auth를 붙이지 않는다. => 글쓰기, 회원정보, 로그아웃은 로그인 된(인증된) 상태여야 가능 -->
+						<li class="nav-item"><a class="nav-link" href="/board/saveForm">글쓰기</a></li>
+						<li class="nav-item"><a class="nav-link" href="/auth/updateForm">회원정보</a></li>
+						<li class="nav-item"><a class="nav-link" href="/logout">로그아웃</a></li>
+					</ul>
+				</c:otherwise>
+			</c:choose>
+		</div>
+	</nav>
+	<br />
+```
+	* Controller 코드
+```
+package com.cos.blog.controller;
+
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+
+import com.cos.blog.service.BoardService;
+
+@Controller
+public class BoardController {
+
+	
+		@Autowired
+		private BoardService boardService;
+		
+	
+		//컨트롤러에서 세션을 어떻게 찾는지?
+		//@AuthenticationPrincipal PrincipalDetail principal
+		@GetMapping({"","/"}) // 아무것도 안 적었을 때와 슬래시를 붙였을 때 이동
+		//스프링에서는 메인페이지로 갈 때 모델이 필요함		
+		public String index(Model model, @PageableDefault(size=3, sort="id", direction = Sort.Direction.DESC) Pageable pageable) { 
+			//index 페이지로 boards를 넘긴다.
+			model.addAttribute("boards", boardService.글목록(pageable));//model은 jsp의 request라고 생각하면 됨
+			// /WEB-INF/views/index.jsp 로 자동
+			return "index"; //controller는 리턴시 viewResolver작동, 해당 index페이지로 model의 정보를 들고 이동
+			
+		}
+	}
+```
+
+
+* 로그인, 회원가입 화면 만들기
+	* user 폴더에 joinForm, loginForm 생성
+![image](https://user-images.githubusercontent.com/86938974/168290266-edcb5dc5-23a8-4dec-a9f7-559658686996.png)
+- loginForm.jsp
+```
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<%@ include file="../layout/header.jsp"%>
+
+<div class="container">
+	<form action = "/auth/loginProc" method = "post">
+		<div class="form-group">
+			<label for="username">Username:</label>
+			<input type="text"  name="username" class="form-control" placeholder="Enter username" id="username">
+		</div>
+
+		<div class="form-group">
+			<label for="password">Password:</label> 
+			<input type="password"  name="password" class="form-control" placeholder="Enter password" id="password">
+		</div>
+		<button id="btn-login" class="btn btn-primary">로그인</button>
+		<a href = "https://kauth.kakao.com/oauth/authorize?client_id=33b04fbab6e3c7a483d83d4b74338eb2&redirect_uri=http://localhost:8000/auth/kakao/callback&response_type=code"><img  height = "38px" src="/image/kakao_login_button.png"></a>
+	</form>
+
+</div>
+
+<!-- 
+<script src="/js/user.js"></script>
+ -->
+<%@ include file="../layout/footer.jsp"%>
+
+```
+
+- joinForm.jsp ( 회원가입 ) 
+```
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<%@ include file="../layout/header.jsp"%>
+<script src="/blog/js/user.js"></script>
+<div class="container">
+	<form>
+		<div class="form-group">
+			<label for="username">Username:</label> <input type="text" class="form-control" placeholder="Enter username" id="username">
+		</div>
+		<div class="form-group">
+			<label for="password">Password:</label> <input type="password" class="form-control" placeholder="Enter password" id="password">
+		</div>
+		<div class="form-group">
+			<label for="email">Email:</label> <input type="email" class="form-control" placeholder="Enter email" id="email">
+		</div>
+	</form>
+	<button id="btn-save" class="btn btn-primary">회원가입완료</button>
+</div>
+
+<!-- /라고 지정하면 static폴더를 바로 찾아감 -->
+<script src="/js/user.js"></script>
+<%@ include file="../layout/footer.jsp"%>
+
+```
+
+	* 회원가입을 위한 기초세팅
+- form 태그에서 설정하는것이 아닌 자바스크립트를 이용해서 ajax 를 사용하여 전달한다.
+- 스프링은 기본적으로 static을 찾아가므로 이 폴더에 정적 파일을 위치시키면 된다.
+- user.js 생성
+![image](https://user-images.githubusercontent.com/86938974/168291522-ff85f210-8a64-48eb-bf01-5e892859e99d.png)
+- user.js 코드
+```
+index = {
+	init:function(){
+		$("#btn-save").on("click",()=>{ //function(){} , ()=>{} this를 바인딩하기 위해서
+			this.save();
+		});
+		$("#btn-update").on("click",()=>{ //function(){} , ()=>{} this를 바인딩하기 위해서
+			this.update();
+		});
+	},
+	
+	save:function(){
+		//alert("user의 save함수 호출됨");
+		let data = {
+			username:$("#username").val(),
+			password: $("#password").val(),
+			email: $("#email").val()
+		};
+		
+		//ajax호출 시 default가 비동기 호출
+		// ajax통신을 이용해서 3개의 데이터를 json으로 변경하여 insert요청
+		//ajax가 통신을 성공하고 서버가 json을 리턴해주면 자동으로 자바 오브젝트로 변환
+		$.ajax({
+			type: "POST",
+			url: "/auth/joinProc",
+			data:JSON.stringify(data), //http body데이터 
+			contentType:"application/json; charset=utf-8", //body데이터가 어떤 타입인지
+			dataType:"json"  //요청을 서버로해서 응답이 왔을 때 기본적으로 모든 것이 문자열(생긴게 json이라면) => javascript오브젝트로 변경해줌
+			//회원가입 수행 요청이 성공시 done실행, 실패시 fail문 실행
+		}).done(function(resp){
+			if(resp.status === 500){
+				alert("회원가입에 실패하였습니다.");
+			}else{
+				alert("회원가입이 완료되었습니다.");
+				location.href="/";
+			}
+		}).fail(function(error){
+			alert(JSON.stringify(error));
+		}); 
+	}
+}
+index.init();
+```
 
 
 
