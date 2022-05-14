@@ -873,15 +873,380 @@ index = {
 }
 index.init();
 ```
+	* api.UserApiController 생성
+![image](https://user-images.githubusercontent.com/86938974/168410791-e3d8723a-b0cb-4458-9c0e-5231bf834691.png)
+```
+package com.cos.blog.controller.api;
+
+import javax.servlet.http.HttpSession;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.cos.blog.config.auth.PrincipalDetail;
+import com.cos.blog.dto.ResponseDto;
+import com.cos.blog.model.User;
+import com.cos.blog.service.UserService;
+
+@RestController//데이터만 리턴
+public class UserApiController {
+	
+//	@Autowired
+//	private HttpSession session;
+	
+	@Autowired //세션 객체는 스프링컨테이너가 bean으로 등록을 해서 가지고 있음
+	private UserService userService;
+	
+	@Autowired
+	private AuthenticationManager authenticationManager;
+	
+	//회원가입 이므로 /auth 붙여서 인증 x
+	//왜 /auth/loginProc를 안 만드는지 : SecurityConfig에서 가로채기 때문
+	@PostMapping("/auth/joinProc")
+	public ResponseDto<Integer> save(@RequestBody User user) { //username, password, email
+		System.out.println("UserApiController: save 호출됨");
+		userService.회원가입(user);
+		return new ResponseDto<Integer>(HttpStatus.OK.value(), 1); // 자바오브젝트를 JSON으로 변환해서 리턴
+		
+	}
+}
+```
+	* dto.ResponseDto 생성
+![image](https://user-images.githubusercontent.com/86938974/168410866-dff19a7f-8156-4d63-a44d-9379b1a78406.png)
+
+```
+package com.cos.blog.dto;
+
+import org.springframework.http.HttpStatus;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class ResponseDto<T> {
+	int status;
+	T data;
+	
+}
+
+```
+	* service.UserService 생성
+- repository는 CRUD를 들고 있다면,
+- 서비스는 두개 이상의 트랜잭션을 하나로 묶어서 하나의 트랜잭션으로 묶어서 서비스할 수 있다. (ex)송금 서비스는 수신과 송신측 둘 다 업데이트에 성공하고 커밋 해줘야한다.) 
+![image](https://user-images.githubusercontent.com/86938974/168411029-302a2953-fe1d-4fbb-b6c4-a0ee3df9797b.png)
+```
+package com.cos.blog.service;
 
 
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import com.cos.blog.model.RoleType;
+import com.cos.blog.model.User;
+import com.cos.blog.repository.UserRepository;
+
+//스프링이 컴포넌트 스캔을 통해서 Bean에 등록을 해줌. IoC를 해준다.
+@Service
+public class UserService {
+
+	@Autowired
+	private UserRepository userRepository;
+	
+	@Transactional
+	public void 회원가입(User user) {
+		String rawPassword = user.getPassword();//1234원문
+		String encPassword = encoder.encode(rawPassword);//해쉬화
+		user.setPassword(encPassword);
+		user.setRole(RoleType.USER);
+		userRepository.save(user);
+	}
+}
+	
+```
+
+* 전통적인 스프링 트랜잭션 순서
+	* 톰캣 시작 - 서버 작동
+	* web.xml
+	* context.xml -> DB 연결 테스트 
+	
+	* request 요청이 들어오면 web.xml을 실행한다.
+	* web.xml에서 DB 연결 세션을 생성하고(JDBC가 커넥션 됨, CRUD 가능)
+	* 트랜잭션이 시작된다.
+	* 필터를 거쳐 요청분기가 가능한 Controller로 간다. Controller는 요청을 확인하고 요청에 맞는 Service를 호출한다.
+	* Service에서는 요청을 확인하고 테이블 두 개를 SELECT 한다. DB에선 A와 B의 계좌 테이블을 영속성 컨텍스트에 객체화 시켜서 만들어놓는다.
+	* Service에서 SELECT된 객체를 repository를 거쳐 응답 받아 갖고있는다. 그 후 Service에서 객체 값을 변경한다. (실제 DB에는 반영 안 됨, 영속성 컨텍스트 객체 변경)
+	* Controller로 응답 받아서 (RestController는 JSON, Controller는 HTML 리턴) 리턴해준다.
+	* Controller에서 응답 해주고 트랜잭션을 종료시켜서 자동으로 영속성 컨텍스트의 값이 변경된 것을 DB에서 변경감지하여 Flush해 집어넣는다. 그리고 DB연결 세션 종료 
+![image](https://user-images.githubusercontent.com/86938974/168411525-de5aa808-5a24-4a16-b36e-2372aa933250.png)
+
+* 기존 방식 문제점 개선( ex) 야구 팀 정보 )
+	* A가 요청 시 영속성컨텍스트를 시작한다.
+	* Controller에서 Service로 요청이 넘어갈 때 JDBC 커넥션, 트랜잭션이 실행된다.
+	* Service에서 Controller로 객체를 넘겨줄 때 JDBC, 트랜잭션, 영속성 컨텍스트를 종료한다.
+	* 따라서 트랜잭션의 범위가 줄어들고 영속성 컨텍스트로 빨리 끝나 DB의 부하가 줄어든다.
+	* 만약 이대호 선수의 정보를 요청하면 Player와 Team은 Many To One이고, Eager 전략에 의해 선수 정보 뿐만 아니라 영속성 컨텍스트에 Team의 정보도 불러와진다.
+	* repository에는 이대호선수의 정보에 대한 객체만 저장되고(Eager이므로 롯데 팀 정보도 이대호 객체에 저장되어있음) Service에서 Controller로 넘어가는 시점에 영속성 컨텍스트, JDBC, 트랜잭션이 종료된다.
+	* 비 영속성 상태가 되었으므로 Controller에서 이대호선수 정보를 돌려주고 끝난다.
+	* LAZY 전략일 경우 영속성 컨텍스트의 1차 캐시에 롯데 팀 정보를 갖고오지 않아 Controller 팀 정보가 필요시 호출이 불가능하다. (영속성 컨텍스트, JDBC, 트랜잭션이 종료 되었기 때문)
+	* 그래서 LAZY일 때는 비어있는 롯데 팀 프록시 객체를 들고온다. 이 때는 Controller가 끝날 때 영속성 컨텍스트를 종료하여 필요시 영속성 컨텍스트에 접근해 롯데 팀 프록시 객체를 이용해 JDBC커넥션을 시작하여 롯데 팀 정보를 불러온다.
+ 	* Controller에서 Select는 가능하지만, 그 정보를 변경해도 변경감지하여 자동으로 수정해주지 않는다. 트랜잭션과 JDBC가 먼저 종료되기 때문
+
+
+![image](https://user-images.githubusercontent.com/86938974/168411924-1fddb413-7e36-486f-9a42-7ff83f695bf7.png)
+
+
+* 스프링 시큐리티 로그인
+	* pom.xml에 다음 코드 삽입
+	* 시큐리티 태그 라이브러리 삽입
+```
+	<dependency>
+		<groupId>org.springframework.security</groupId>
+		<artifactId>spring-security-taglibs</artifactId>
+	</dependency>
+	
+	<dependency>
+		<groupId>org.springframework.boot</groupId>
+		<artifactId>spring-boot-starter-security</artifactId>
+	</dependency>
+```
+![image](https://user-images.githubusercontent.com/86938974/168412235-023d50f2-0e49-4779-87d2-9be65319d6b8.png)
+- Maven Dependencies 에서 다운로드 확인
+- 다음 코드를 header.jsp 맨 위에 삽입
+
+```
+<%@ taglib prefix="sec" uri="http://www.springframework.org/security/tags"%>
+
+	* 시큐리티 라이브러리가 설치되면 홈페이지 어느곳에 접근하던지 스프링 시큐리티가 가로챈다.
+	* 자동으로 세션 생성
+	* 그 값을 principal에 저장
+<!-- 인증이 되었는지 확인 -->
+<sec:authorize access="isAuthenticated()">
+	<!-- principal = current user object에게 direct access를 허용 -->
+	<sec:authentication property="principal" var="principal" />
+</sec:authorize>
+```
+
+	* 스프링 시큐리티 로그인 페이지 커스터마이징
+- 인증이 안 된 사용자들이 출입할 수 있는 경로들 /auth/** 허용
+- 그냥 주소가 / 이면 index.jsp허용
+- static이하에 있는 /js/** , /css/**, /image/** 허용
+- 허용하는 이유는 로그인과 회원가입시에는 인증을 할 필요가 없기 때문
+
+- UserApiController 다음과 같이 /auth를 앞에 붙여주면 된다.
+```
+//회원가입 이므로 /auth 붙여서 인증 x
+	//왜 /auth/loginProc를 안 만드는지 : SecurityConfig에서 가로채기 때문
+	@PostMapping("/auth/joinProc")
+	public ResponseDto<Integer> save(@RequestBody User user) { //username, password, email
+		System.out.println("UserApiController: save 호출됨");
+		userService.회원가입(user);
+		return new ResponseDto<Integer>(HttpStatus.OK.value(), 1); // 자바오브젝트를 JSON으로 변환해서 리턴
+		
+	}
+
+```
+
+	* config.SecurityConfig 생성
+![image](https://user-images.githubusercontent.com/86938974/168412614-944997df-6e18-40b2-8e8d-ca18dc94c4c9.png)
+```
+package com.cos.blog.config;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
+import org.springframework.security.config.annotation.method.configuration.EnableGlobalMethodSecurity;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+
+import com.cos.blog.config.auth.PrincipalDetailService;
+
+// 빈 등록 : 스프링 컨테이너에서 객체를 관리할 수 있게 하는 것(IoC관리)
+@Configuration
+//컨트롤러로 가서 실행이 되기 전 모든 요청이 이곳으로 온다.
+@EnableWebSecurity //시큐리티 필터가 등록이 된다.  = 스프링 시큐리티가 활성화 되어 있는데 어떤 설정을 해당 파일(아래 SecurityConfig)에서 하겠다.
+@EnableGlobalMethodSecurity(prePostEnabled = true) // 특정 주소로 접근을 하면 권한 및 인증을 미리 체크하겠다는 뜻.
+//위 세개는 세트이다. 함께 다님
+public class SecurityConfig extends WebSecurityConfigurerAdapter {
+
+@Override
+	protected void configure(HttpSecurity http) throws Exception{
+		//request가 아래 주소(antMatchers의 주소)로 들어오면, 누구나 들어올 수 있다. permitAll
+		http
+			//form태그의 id값을 가져와서 ajax로 요청을 했기 때문에 csrf토큰이 없어서 막아버리기 때문
+			.csrf().disable()//csrf토큰 비활성화 (테스트시 걸어두는게 좋음)
+			.authorizeRequests()
+			.antMatchers("/", "/auth/**","/js/**", "/css/**", "/image/**","/dummy/**")
+			.permitAll()// /auth/**는 허락하고,
+			.anyRequest()  //다른 Request주소는 
+			.authenticated() // 인증을 해야해
+		.and()
+			.formLogin()
+			//매핑된 /auth/loginForm은 자동으로 뜸, '/'만 붙여서 접근하면 제한되어 있기 때문에
+			//auth로 갈 때 빼고는 인증이 필요하다. 위에서 걸어줬기 때문
+			// 슬러시 '/'로 오면 당연히 인증이 필요하므로 아래 페이지로 이동한다.
+			//인증이 되지 않는 어떤 요청은 loginForm으로 온다.
+			.loginPage("/auth/loginForm")
+			//위에서 로그인을 수행 후 버튼을 클릭하면 
+			.loginProcessingUrl("/auth/loginProc") //스프링 시큐리티가 해당 주소로 요청오는 로그인을 가로채서 대신 로그인 해준다.
+			.defaultSuccessUrl("/");//위 요청이 정상적으로 완료 되면 이동함
+			
+		
+	}
 
 	
+}
+```
+
+	* 비밀번호 해쉬 후 회원가입
+- 위 코드에 다음과 같이 추가
+```
+@Bean //IoC가 된다.
+	//시큐리티가 들고있는 함수
+	public BCryptPasswordEncoder encodePWD() {
+		//암호화해서 encPassword에 넣어줌
+		//	String encPassword = new BCryptPasswordEncoder().encode(null)
+		//IoC = 리턴되는 아래 객체를 스프링이 관리한다.
+		return new BCryptPasswordEncoder();
+	}	
+```
+- UserService.java에 다음 코드 추가
+```
+	@Autowired
+	private BCryptPasswordEncoder encoder;
+	
+	@Transactional
+	public void 회원가입(User user) {
+		String rawPassword = user.getPassword();//1234원문
+		String encPassword = encoder.encode(rawPassword);//해쉬화
+		user.setPassword(encPassword);
+		user.setRole(RoleType.USER);
+		userRepository.save(user);
+	}
+```
+	* config.auth에 다음 파일들 생성
+	
+![image](https://user-images.githubusercontent.com/86938974/168413127-6948ccfb-61a9-4542-80b0-e76c49876537.png)
+- PrincipalDetail.java
+```
+package com.cos.blog.config.auth;
+
+import java.util.ArrayList;
+import java.util.Collection;
+
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
+
+import com.cos.blog.model.User;
+
+import lombok.Getter;
 
 
+// 스프링 시큐리티가 로그인 요청을 가로채서 로그인을 진행하고 완료가 되면 userDetails 타입의 오브젝트를
+// 스프링 시큐리티의 고유한 세션장소에 저장을 해준다.
+//@Data //Getter Setter 다 만듬
+@Getter
+public class PrincipalDetail implements UserDetails {
+	private User user; //컴포지션(객체를 품고있음)
 
+	public PrincipalDetail(User user) {
+		this.user = user;
+	}
+	
+	//alt shift s 오버라이드
+	@Override
+	public String getPassword() {
+		return user.getPassword();
+	}
+
+	@Override
+	public String getUsername() {
+		return user.getUsername();
+	}
+
+	//계정이 만료되지 않았는지 리턴한다.(true:만료 안됨)
+	@Override
+	public boolean isAccountNonExpired() {
+		return true;
+	}
+
+	//계정이 잠겨있는지 리턴(true:안 잠김)
+	@Override
+	public boolean isAccountNonLocked() {
+		// TODO Auto-generated method stub
+		return true;
+	}
+
+	//비밀번호가 만료되지 않았는지 리턴(true:만료 안됨)
+	@Override
+	public boolean isCredentialsNonExpired() {
+		// TODO Auto-generated method stub
+		return true;
+	}
+
+	//계정 활성화(사용가능)인지 리턴(true: 활성화)
+	@Override
+	public boolean isEnabled() {
+		// TODO Auto-generated method stub
+		return true;
+	}
+	
+	//계정의 권한 리턴
+	@Override
+	// GrantedAuthority를 상속한 클래스 형태의 Collection객체를 리턴	
+	public Collection<? extends GrantedAuthority> getAuthorities() {
+		
+		//ArrayList의 부모는 Collection이다
+		Collection<GrantedAuthority> collectors = new ArrayList<>();
+//		collectors.add(new GrantedAuthority() {
+//
+//			@Override
+//			public String getAuthority() {
+//				// 스프링에서 ROLE을 받을 때 규칙, ROLE을 꼭 넣어줘야함.				
+//				return "ROLE_"+user.getRole(); //ROLE_USER 리턴해줘야 인식 가능
+//			}
+//		});
+		
+		collectors.add(()->{return "ROLE_"+user.getRole();});
+		
+		return collectors;
+	}
+	
+}
+
+```
+
+- config.SecurityConfig.java에 다음 코드 추가
+```
+//시큐리티가 대신 로그인해주는데 password를 가로채기 하는데
+	//해당 password가 어떤걸로 해쉬가 되어 회원가입이 되었는지 알아야
+	//같은 해쉬로 암호화해서 DB에 있는 해쉬랑 비교 가능
+	@Override
+	protected void configure(AuthenticationManagerBuilder auth) throws Exception {
+		auth.userDetailsService(principalDetailService).passwordEncoder(encodePWD());
+	}
+```
 
 	
 
