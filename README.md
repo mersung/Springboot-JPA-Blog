@@ -1303,12 +1303,306 @@ public interface UserRepository extends JpaRepository<User, Integer>{
 }	
 ```
 
+	* 글쓰기 (saveForm.jsp)
+![image](https://user-images.githubusercontent.com/86938974/168475502-2385ee9b-3995-467e-8216-fdfd092419fd.png)
 
+```
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<%@ include file="../layout/header.jsp"%>
+
+<div class="container">
+	<form>
+		<div class="form-group">
+			<input type="text" class="form-control" placeholder="Enter title" id="title">
+		</div>
+
+		<div class="form-group">
+			<textarea class="form-control summernote" rows="5" id="content"></textarea>
+		</div>
+	</form>
+	<button id="btn-save" class="btn btn-primary">글쓰기완료</button>
+</div>
+
+<script>
+	$('.summernote').summernote({
+		tabsize : 2,
+		height : 300
+	});
+</script>
+<script src="/js/board.js"></script>
+<%@ include file="../layout/footer.jsp"%>
+
+
+```
+	* board.js에 다음 코드 추가
+```
+index = {
+	init:function(){
+		$("#btn-save").on("click",()=>{ //function(){} , ()=>{} this를 바인딩하기 위해서
+			this.save();
+		});
+		
+	save:function(){
+		//alert("user의 save함수 호출됨");
+		let data = {
+			title:$("#title").val(),
+			content: $("#content").val()
+		};
+		
+		$.ajax({
+			type: "POST",
+			url: "/api/board",
+			data:JSON.stringify(data),
+			contentType:"application/json; charset=utf-8", //body데이터가 어떤 타입인지
+			dataType:"json" 
+		}).done(function(resp){
+			alert("글쓰기가 완료되었습니다.");
+			location.href="/";
+		}).fail(function(error){
+			alert(JSON.stringify(error));
+		}); 
+	}
+}
+```
+	* BoardApiController 생성
+![image](https://user-images.githubusercontent.com/86938974/168475751-e98a353a-90be-4608-bdb5-38abc558a0a8.png)
+```
+package com.cos.blog.controller.api;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.cos.blog.config.auth.PrincipalDetail;
+import com.cos.blog.dto.ReplySaveRequestDto;
+import com.cos.blog.dto.ResponseDto;
+import com.cos.blog.model.Board;
+import com.cos.blog.service.BoardService;
+
+@RestController//데이터만 리턴
+public class BoardApiController {
 	
+	@Autowired
+	private BoardService boardService;
+
+	@PostMapping("/api/board")
+	public ResponseDto<Integer> save(@RequestBody Board board, @AuthenticationPrincipal PrincipalDetail principal) {
+		boardService.글쓰기(board, principal.getUser());
+		return new ResponseDto<Integer>(HttpStatus.OK.value(), 1); 
+		
+	}
+}
+```
+
+	* BoardRepository 생성
+![image](https://user-images.githubusercontent.com/86938974/168475798-3566d425-006c-450d-a7d3-b6703112f8fb.png)
+```
+package com.cos.blog.repository;
+
+import java.util.Optional;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import com.cos.blog.model.Board;
+import com.cos.blog.model.User;
+
+public interface BoardRepository extends JpaRepository<Board, Integer>{
+	//Jpa레포지토리가 다 들고있음, findAll()등등
+
+}
+
+```
+	* BoardService 생성
+![image](https://user-images.githubusercontent.com/86938974/168475814-887dbca5-3000-4676-942a-c2b597399c08.png)
+```
+package com.cos.blog.service;
 
 
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.cos.blog.dto.ReplySaveRequestDto;
+import com.cos.blog.model.Board;
+import com.cos.blog.model.User;
+import com.cos.blog.repository.BoardRepository;
+import com.cos.blog.repository.ReplyRepository;
+import com.cos.blog.repository.UserRepository;
 
 
+@Service
+public class BoardService {
+
+	@Autowired
+	private BoardRepository boardRepository;
+	
+	@Transactional
+	public void 글쓰기(Board board, User user) { // title, content받음
+		board.setCount(0);
+		board.setUser(user);
+		boardRepository.save(board);
+
+	}
+}
+```
+	* 글 목록 보기
+	* BoardController에 다음 코드 추가
+```
+@Autowired
+private BoardService boardService;
+	
+/컨트롤러에서 세션을 어떻게 찾는지?
+//@AuthenticationPrincipal PrincipalDetail principal
+@GetMapping({"","/"}) // 아무것도 안 적었을 때와 슬래시를 붙였을 때 이동
+//스프링에서는 메인페이지로 갈 때 모델이 필요함		
+public String index(Model model, @PageableDefault(size=3, sort="id", direction = Sort.Direction.DESC) Pageable pageable) { 
+	//index 페이지로 boards를 넘긴다.
+	model.addAttribute("boards", boardService.글목록(pageable));//model은 jsp의 request라고 생각하면 됨
+	// /WEB-INF/views/index.jsp 로 자동
+	return "index"; //controller는 리턴시 viewResolver작동, 해당 index페이지로 model의 정보를 들고 이동
+			
+}
+```
+	* BoardService에 코드 추가
+```
+@Transactional(readOnly = true)
+	//페이지 타입의 보드들을 리턴
+	public Page<Board> 글목록(Pageable pageable){
+		return boardRepository.findAll(pageable);
+	}
+```
+
+	* 글 상세보기
+	* BoardController, BoardService 에 글상세보기 추가
+- BoardController
+```
+@GetMapping("/board/{id}")
+		public String findById(@PathVariable int id, Model model) {
+			model.addAttribute("board", boardService.글상세보기(id));
+
+			return "board/detail";
+			
+		}
+```
+- BoardService
+```
+@Transactional(readOnly = true)
+	public Board 글상세보기(int id) {
+		return boardRepository.findById(id)
+				.orElseThrow(()->{
+					return new IllegalArgumentException("글 상세보기 실패: 아이디를 찾을 수 없습니다.");
+				});
+	}
+```
+
+- detail.jsp 생성(글 상세보기 페이지)
+![image](https://user-images.githubusercontent.com/86938974/168476648-b26637d9-6c38-43f0-a060-c7f3525166ae.png)
+```
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<%@ include file="../layout/header.jsp"%>
+
+<div class="container">
+	<button class="btn btn-secondary" onclick="history.back()">돌아가기</button>
+
+	<c:if test="${board.user.id == principal.user.id}">
+		<a href="/board/${board.id}/updateForm" class="btn btn-warning">수정</a>
+		<button id="btn-delete" class="btn btn-danger">삭제</button>
+	</c:if>
+	<br /> <br />
+	<div>
+		글 번호 : <span id="id"><i>${board.id} </i></span> 작성자 : <span><i>${board.user.username} </i></span>
+	</div>
+	<br />
+	<div>
+		<h3>${board.title}</h3>
+	</div>
+	<hr />
+	<div>
+		<div>${board.content}</div>
+	</div>
+	<hr />
+
+	<div class="card">
+		<form>
+			<input type="hidden" id="userId" value="${principal.user.id}" /> <input type="hidden" id="boardId" value="${board.id}" />
+			<div class="card-body">
+				<textarea id="reply-content" class="form-control" rows="1"></textarea>
+			</div>
+			<div class="card-footer">
+				<button type="button" id="btn-reply-save" class="btn btn-primary">등록</button>
+			</div>
+		</form>
+	</div>
+	<br />
+	<div class="card">
+		<div class="card-header">댓글 리스트</div>
+		<ul id="reply-box" class="list-group">
+			<c:forEach var="reply" items="${board.replys }">
+				<li id="reply-${reply.id }" class="list-group-item d-flex justify-content-between">
+					<div>${reply.content }</div>
+					<div class="d-flex">
+						<div class="font-italic">작성자 : ${reply.user.username} &nbsp;</div>
+						<c:if test="${reply.user.id == principal.user.id}">
+							<button onClick="index.replyDelete(${board.id}, ${reply.id})" class="badge">삭제</button>
+						</c:if>
+					</div>
+				</li>
+			</c:forEach>
+		</ul>
+	</div>
+</div>
+
+<script src="/js/board.js"></script>
+<%@ include file="../layout/footer.jsp"%>
+
+```
+
+	* 글 삭제하기
+- board.js에 다음 코드 추가
+```
+$("#btn-delete").on("click",()=>{ //function(){} , ()=>{} this를 바인딩하기 위해서
+			this.deleteById();
+		});
+deleteById:function(){
+		let id = $("#id").text();
+		$.ajax({
+			type: "DELETE",
+			url: "/api/board/"+id,
+			dataType:"json",
+			contentType:'application/json; charset=utf-8'
+		}).done(function(resp){
+			alert("삭제가 완료되었습니다.");
+			location.href="/";
+		}).fail(function(error){
+			alert(JSON.stringify(error));
+		}); 
+	}
+```
+- BoardApiController 에 추가
+```
+@DeleteMapping("/api/board/{id}")
+	public ResponseDto<Integer> deleteById(@PathVariable int id){
+		boardService.글삭제하기(id);
+		//1을 리턴하면 정상이라는 뜻
+		return new ResponseDto<Integer>(HttpStatus.OK.value(), 1); 
+	}
+```
+- BoardService에 추가
+```
+@Transactional
+	public void 글삭제하기(int id) {
+		System.out.println("글삭제하기:"+id);
+		boardRepository.deleteById(id);
+	}
+```
 
 
