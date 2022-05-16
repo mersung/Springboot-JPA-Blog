@@ -1605,4 +1605,502 @@ deleteById:function(){
 	}
 ```
 
+	* 글 수정하기 (BoardController에 추가)
+```
+@GetMapping("/board/{id}/updateForm")
+		public String updateForm(@PathVariable int id, Model model) {
+			model.addAttribute("board", boardService.글상세보기(id));
+			return "board/updateForm";
+		}
+```
+- updateForm.jsp 생성
+![image](https://user-images.githubusercontent.com/86938974/168609034-ec80b904-4580-4962-aa8f-9b42b82383f6.png)
+```
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<%@ include file="../layout/header.jsp"%>
+<script src="/blog/js/user.js"></script>
+<div class="container">
+	<form>
+		<input type="hidden" id="id" value="${principal.user.id}" />
+		<div class="form-group">
+			<label for="username">Username:</label> <input type="text" value="${principal.user.username}" name="username" class="form-control" placeholder="Enter username" id="username">
+		</div>
+
+		<c:if test="${empty principal.user.oauth}">
+			<div class="form-group">
+				<label for="password">Password:</label> 
+				<input type="password" name="password" class="form-control" placeholder="Enter password" id="password">
+			</div>
+		</c:if>
+		<div class="form-group">
+			<label for="email">Email:</label> 
+			<input type="email" value="${principal.user.email}" class="form-control" placeholder="Enter email" id="email" readonly>
+		</div>
+	</form>
+	<button id="btn-update" class="btn btn-primary">회원수정완료</button>
+</div>
+
+<!-- /라고 지정하면 static폴더를 바로 찾아감 -->
+<script src="/js/user.js"></script>
+<%@ include file="../layout/footer.jsp"%>
+
+
+```
+- board.js에 추가
+```
+$("#btn-update").on("click",()=>{ //function(){} , ()=>{} this를 바인딩하기 위해서
+			this.update();
+		});
+		
+update:function(){
+		let id = $("#id").val();
+
+		let data = {
+			title:$("#title").val(),
+			content: $("#content").val()
+		};
+		
+		$.ajax({
+			type: "PUT",
+			url: "/api/board/"+id,
+			data:JSON.stringify(data),
+			contentType:"application/json; charset=utf-8", //body데이터가 어떤 타입인지
+			dataType:"json" 
+		}).done(function(resp){
+			alert("글수정이 완료되었습니다.");
+			location.href="/";
+		}).fail(function(error){
+			alert(JSON.stringify(error));
+		}); 
+	}
+```
+- BoardApiController에 추가
+```
+@PutMapping("/api/board/{id}")
+	public ResponseDto<Integer> update(@PathVariable int id, @RequestBody Board board){
+		boardService.글수정하기(id, board);
+		return new ResponseDto<Integer>(HttpStatus.OK.value(),1);
+		
+	}
+```
+
+- BoardService에 추가
+```
+@Transactional
+	public void 글수정하기(int id, Board requestBoard) {
+		Board board = boardRepository.findById(id)
+				.orElseThrow(()->{
+					return new IllegalArgumentException("글 찾기 실패: 아이디를 찾을 수 없습니다.");
+				}); //영속화 완료
+		board.setTitle(requestBoard.getTitle());
+		board.setContent(requestBoard.getContent());
+		//해당 함수로 종료시(Service가 종료될 때)트랜잭션이 종료된다. 이때 더티체킹 - 자동 업데이트가 됨, db flush
+	}
+```
+	* 회원 수정하기
+- UserController에 코드 추가
+```
+@GetMapping("/auth/updateForm")
+	public String updateForm(@AuthenticationPrincipal PrincipalDetail principal) {
+		return "user/updateForm";
+	}
+```
+
+- updateForm.jsp 생성
+```
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<%@ include file="../layout/header.jsp"%>
+<script src="/blog/js/user.js"></script>
+<div class="container">
+	<form>
+		<input type="hidden" id="id" value="${principal.user.id}" />
+		<div class="form-group">
+			<label for="username">Username:</label> <input type="text" value="${principal.user.username}" name="username" class="form-control" placeholder="Enter username" id="username">
+		</div>
+
+		<c:if test="${empty principal.user.oauth}">
+			<div class="form-group">
+				<label for="password">Password:</label> 
+				<input type="password" name="password" class="form-control" placeholder="Enter password" id="password">
+			</div>
+		</c:if>
+		<div class="form-group">
+			<label for="email">Email:</label> 
+			<input type="email" value="${principal.user.email}" class="form-control" placeholder="Enter email" id="email" readonly>
+		</div>
+	</form>
+	<button id="btn-update" class="btn btn-primary">회원수정완료</button>
+</div>
+
+<!-- /라고 지정하면 static폴더를 바로 찾아감 -->
+<script src="/js/user.js"></script>
+<%@ include file="../layout/footer.jsp"%>
+
+```
+
+- user.js 에 코드 추가
+```
+$("#btn-update").on("click",()=>{ //function(){} , ()=>{} this를 바인딩하기 위해서
+			this.update();
+		});
+update:function(){
+
+		let data = {
+			id : $("#id").val(),
+			username:$("#username").val(),
+			password:$("#password").val(),
+			email: $("#email").val()
+		};
+		
+		$.ajax({
+			type: "PUT",
+			url: "/user",
+			data:JSON.stringify(data),
+			contentType:"application/json; charset=utf-8", //body데이터가 어떤 타입인지
+			dataType:"json" 
+		}).done(function(resp){
+			alert("회원수정이 완료되었습니다.");
+			location.href="/";
+		}).fail(function(error){
+			alert(JSON.stringify(error));
+		}); 
+	}
+```
+- userApiController, SecurityConfig에 코드 추가 (세션 값 변경 코드)
+
+- SecurityConfig
+```
+@Bean
+	@Override
+	public AuthenticationManager authenticationManagerBean() throws Exception {
+		return super.authenticationManagerBean();
+	}
+```
+- userApiController
+```
+@PutMapping("/user")
+	public ResponseDto<Integer> update(@RequestBody User user){ //RequestBody가 없을 경우 Json을 못받음, key=value형태로만 받을 수 있게됨
+		userService.회원수정(user);
+		//트랜잭션이 종료되기 때문에 DB에 값은 변경이 됐음.
+		//하지만 세션값은 변경되지 않은 상태이기 때문에 직접 세션값을 변경해줘야한다.
+		//회원수정을 해도 DB에는 변경이 되지만 회원수정 탭에서 볼 땐 그대로이다.
+		
+		//세션 등록
+		//어썬티케이션 매니저에게 유저네임과 패스워드를 던져서
+		//매니저가 자동으로 세션등록 해준다. 워드문서 참고
+		Authentication authentication = authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(user.getUsername(),user.getPassword()));
+		SecurityContextHolder.getContext().setAuthentication(authentication);
+
+		return new ResponseDto<Integer>(HttpStatus.OK.value(), 1);
+	}
+```
+- UserService에 코드 추가
+```
+@Transactional
+	public void 회원수정(User user) {
+		//수정시에는 영속성 컨텍스트 User 오브젝트를 영속화시키고, 영속화된 User 오브젝트를 수정
+		//select를 해서 User오브젝트를 Db로 부터 가져오는 이유는 영속화를 하기 위해서
+		// 영속화된 오브젝트를 변경하면 DB에 Update문을 날려주기때문	
+		User persistance = userRepository.findById(user.getId()).orElseThrow(()->{
+			return new IllegalArgumentException("회원 찾기 실패");
+		});
+		
+		// oauth에 값이 없으면 수정 가능
+		// Validate 체크, 카카오 로그인 한 사람들은 비밀번호를 변경 못 하게끔 해야함
+		if(persistance.getOauth()==null || persistance.getOauth().equals("")) {
+			String rawPassword = user.getPassword();
+			String encPassword = encoder.encode(rawPassword);
+			persistance.setPassword(encPassword);
+			persistance.setEmail(user.getEmail());
+		}
+		
+		//회원수정 함수 종료시 = 서비스 종료시 = 트랜잭션 종료 = commit이 자동으로 됨
+		//영속화된 persistance객체의 변화가 감지되면 더티체킹이 되어 update문을 날려준다.
+
+		}
+```
+
+	* 카카오 로그인 환경설정
+- https://developers.kakao.com/ 접속
+- 애플리케이션 추가
+![image](https://user-images.githubusercontent.com/86938974/168613728-44718a7a-0cf2-4aa1-86c5-3de1d1dd861b.png)
+- REST API 키 저장
+![image](https://user-images.githubusercontent.com/86938974/168613790-6c126781-1dfe-4939-a44a-d226c22b9318.png)
+- 웹 플랫폼 등록
+![image](https://user-images.githubusercontent.com/86938974/168613905-b1527ba8-9bdd-452e-bdfe-596803165eeb.png)
+- Redirect URI (카카오 로그인이 정상 실행시 응답받을 주소)
+![image](https://user-images.githubusercontent.com/86938974/168614046-89bf1c11-55ad-432a-bd47-1d346cfc822f.png)
+
+- 프로필 정보 필수 동의 (이메일은 선택 동의)
+![image](https://user-images.githubusercontent.com/86938974/168614307-e7958ee0-91f0-4e74-9e4f-eccc33d6db87.png)
+
+	* 카카오 로그인 OAuth2.0 이란?
+- 모든 사이트에 내 정보가 저장되어 있음.
+- 이 모든 정보들을 하나의 대형 포털사이트에서 관리하면 편함.
+- ex) naver, 카카오
+- Open Auth : 인증 처리를 대신 해준다.
+- 예를 들어 홍길동이 Blog에 로그인 요청시 Blog는 카카오에 카카오 로그인 요청을 한다.
+- 블로그는 로그인 페이지를 홍길동에게 제공하고, 카카오 버튼을 클릭시 카카오 로그인 요청이 시작된다.
+- 카카오 서버 쪽으로 요청된 카카오 로그인으로 인해 카카오 서버에서는 홍길동에게 카카오 로그인창, 동의창을 제공한다.
+- 모두 동의 후 버튼 클릭시 카카오 서버에서 블로그 서버쪽으로 callback을 해준다. 이 때 code를 만들어서 준다.
+- Blog 서버에선 code를 받았을 때, 인증처리 완료를 한다. 
+- 카카오 서버는 자원 서버를 들고 있는데 이는 홍길동의 정보를 들고 있다. 
+- Blog 서버는 받은 code값을 통해 카카오 API서버에게 자원 서버의 데이터 권한 요청을 한다.
+- 카카오 API서버에서 확인 후 정상임을 확인하면 Access Token을 주어 Blog서버는 자원 서버 안의 홍길동 정보에게 접근할 수 있는 권한을 부여 받는다.
+- Access Token을 통해 카카오 자원 서버 안의 유저 정보에 대해 접근할 수 있는 권한을 얻는다.
+- Access Token은 사용자가 Blog서버에게 카카오 자원 서버에 접근하여 자신의 정보를 얻을 수 있는 권한을 부여한 것이고,
+- code는 단지 인증에 성공한 것이다.
+
+![image](https://user-images.githubusercontent.com/86938974/168616500-86a466d5-4d03-4779-8a3a-b41a5efdd17d.png)
+
+- 카카오 로그인 - 버튼 다운로드
+![image](https://user-images.githubusercontent.com/86938974/168616991-26d3516b-4df5-4046-89e8-3e0706458b52.png)
+- 다음과 같이 저장
+![image](https://user-images.githubusercontent.com/86938974/168617121-a38b132b-de79-4de6-8009-837d6f203955.png)
+- loginForm.jsp에 a태그 추가
+
+```
+<a href = "https://kauth.kakao.com/oauth/authorize?client_id=33b04fbab6e3c7a483d83d4b74338eb2&redirect_uri=http://localhost:8000/auth/kakao/callback&response_type=code"><img  height = "38px" src="/image/kakao_login_button.png"></a>
+```
+- 문서 - REST API 키 복사
+- (로그인 요청 주소)
+- {app_key}에 클라이언트 키를, {redirect_uri}에는 콜백 주소를 넣는다.
+![image](https://user-images.githubusercontent.com/86938974/168617419-72f44a1e-bdaf-4425-a232-c10e9b64fb0d.png)
+![image](https://user-images.githubusercontent.com/86938974/168617727-c6532a88-ff74-45fa-bc27-9ee889b445a4.png)
+
+- 토큰 발급 요청
+- 주소 (POST) http body에 데이터를 전달(5가지 데이터)
+
+![image](https://user-images.githubusercontent.com/86938974/168618601-ebd4383b-da13-4899-8117-81fcde64faf7.png)
+
+
+![image](https://user-images.githubusercontent.com/86938974/168618232-2cdb998e-c78c-4863-bacb-306afa666326.png)
+
+
+
+
+- UserController에 코드 추가(5가지 데이터 전달)
+```
+@GetMapping("/auth/kakao/callback")
+	public String kakaoCallback(String code) { // Data를 리턴해주는 컨트롤러 함수
+		
+		//POST방식으로 key=value 데이터를 요청(카카오쪽으로)
+		RestTemplate rt = new RestTemplate();
+		
+		//HttpHeader 오브젝트 생성
+		HttpHeaders headers = new HttpHeaders();
+		headers.add("Content-type", "application/x-www-form-urlencoded;charset=utf-8");
+		
+		//HttpBody 오브젝트 생성
+		MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
+		params.add("grant_type", "authorization_code");
+		params.add("client_id", "33b04fbab6e3c7a483d83d4b74338eb2");
+		params.add("redirect_uri", "http://localhost:8000/auth/kakao/callback");
+		params.add("code", code);
+		
+		//HttpHeader와 HttpBody를 하나의 오브젝트에 담기
+		HttpEntity<MultiValueMap<String, String>> kakaoTokenRequest = 
+				new HttpEntity<>(params, headers);
+		
+		//Http요청하기 - Post방식으로 - 그리고 response 변수의 응답 받음.
+		ResponseEntity<String> response = rt.exchange( //exchange 함수가 HttpEntity라는 오브젝트를 받기로 되어있음.
+				"https://kauth.kakao.com/oauth/token",
+				HttpMethod.POST,
+				kakaoTokenRequest,
+				String.class
+		);
+```
+
+	* 토큰을 통한 사용자 정보 조회(POST) 사용자 관리 - REST API - 사용자 정보 요청 참고
+![image](https://user-images.githubusercontent.com/86938974/168620477-070e6cea-6768-4852-81cc-f3b814ff5764.png)
+
+- OAuthToken.java생성
+```
+package com.cos.blog.model;
+
+import lombok.Data;
+
+@Data
+public class OAuthToken {
+	private String access_token;
+	private String token_type;
+	private String refresh_token;
+	private int expires_in;
+	private String scope;
+	private int refresh_token_expires_in;
+}
+
+```
+
+- KakaoProfile.java 생성
+```
+
+package com.cos.blog.model;
+
+import lombok.Data;
+
+@Data
+//하나의 클래스에는 퍼블릭이 하나밖에 존재하지 못한다
+public class KakaoProfile {
+
+	public Long id;
+	public String connected_at;
+	public Properties properties;
+	public KakaoAccount kakao_account;
+
+	@Data
+	public class Properties {
+
+		public String nickname;
+		public String profile_image;
+		public String thumbnail_image;
+
+	}
+
+	
+	@Data
+	public class KakaoAccount {
+		
+		public Boolean profile_nickname_needs_agreement;
+		public Boolean profile_image_needs_agreement;
+		public Profile profile;
+		public Boolean has_email;
+		public Boolean email_needs_agreement;
+		public Boolean is_email_valid;
+		public Boolean is_email_verified;
+		public String email;
+
+		@Data
+		public class Profile {
+			
+			public String profile_nickname_needs_agreement;
+			public String nickname;
+			public String thumbnail_image_url;
+			public String profile_image_url;
+			public Boolean is_default_image;
+
+		}
+
+	}
+
+}
+
+```
+
+- UserController에 코드 추가
+```
+//Gson, Json Simple, ObjectMapper
+		ObjectMapper obMapper = new ObjectMapper();
+		OAuthToken oauthToken = null;
+		try {
+			 	oauthToken = obMapper.readValue(response.getBody(), OAuthToken.class);
+		}catch(JsonMappingException e) {
+			e.printStackTrace();
+		}catch(JsonProcessingException e) {
+			e.printStackTrace();
+		}
+		
+		System.out.println("카카오 액세스 토큰:"+oauthToken.getAccess_token());
+		
+		RestTemplate rt2 = new RestTemplate();
+		
+		//HttpHeader 오브젝트 생성
+		HttpHeaders headers2 = new HttpHeaders();
+		headers2.add("Authorization", "Bearer "+oauthToken.getAccess_token());
+		headers2.add("Content-type", "application/x-www-form-urlencoded;charset=utf-8");
+		
+		//HttpHeader와 HttpBody를 하나의 오브젝트에 담기
+		HttpEntity<MultiValueMap<String, String>> kakaoProfileRequest2 = 
+				new HttpEntity<>(headers2);
+		
+		//Http요청하기 - Post방식으로 - 그리고 response 변수의 응답 받음.
+		ResponseEntity<String> response2 = rt2.exchange( //exchange 함수가 HttpEntity라는 오브젝트를 받기로 되어있음.
+				"https://kapi.kakao.com/v2/user/me",
+				HttpMethod.POST,
+				kakaoProfileRequest2,
+				String.class
+		);
+		System.out.println(response2.getBody());
+		
+		ObjectMapper obMapper2 = new ObjectMapper();
+		KakaoProfile kakaoProfile = null;
+		try {
+			kakaoProfile = obMapper2.readValue(response2.getBody(), KakaoProfile.class);
+		}catch(JsonMappingException e) {
+			e.printStackTrace();
+		}catch(JsonProcessingException e) {
+			e.printStackTrace();
+		}
+		
+		//User오브젝트 : username, password, email
+		System.out.println("카카오 아이디(번호):"+kakaoProfile.getId());
+		System.out.println("카카오 이메일:"+kakaoProfile.getKakao_account().getEmail());
+		
+		System.out.println("블로그서버 유저네임:"+kakaoProfile.getKakao_account().getEmail()+"_"+kakaoProfile.getId());
+		System.out.println("블로그서버 이메일:"+kakaoProfile.getKakao_account().getEmail());
+//		UUID garbagePassword = UUID.randomUUID();
+		//UUID란 중복되지 않는 어떤 특정 값을 만들어내는 알고리즘
+		System.out.println("블로그서버 패스워드: "+cosKey);
+		
+		
+		User kakaoUser = User.builder()
+			.username(kakaoProfile.getKakao_account().getEmail()+"_"+kakaoProfile.getId())
+			.password(cosKey)
+			.email(kakaoProfile.getKakao_account().getEmail())
+			.oauth("kakao")
+			.build();
+		
+		//가입자 혹은 비가입자 체크 해서 처리
+		User originUser = userService.회원찾기(kakaoUser.getUsername());
+		
+		if(originUser.getUsername() == null) {
+			System.out.println("기존 회원이 아니기에 자동 회원가입을 진행합니다.");
+			userService.회원가입(kakaoUser);
+		}
+		
+		System.out.println("자동 로그인을 진행합니다.");
+		//로그인 처리
+		Authentication authentication = authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(kakaoUser.getUsername(), cosKey));
+		SecurityContextHolder.getContext().setAuthentication(authentication);
+		return "redirect:/";
+		
+//		return "카카오 토큰 요청 완료 : 토큰요청에 대한 응답:"+response.getBody();
+	}
+```
+
+- UserService에 코드 추가
+- 카카오 사용자들은 패스워드 수정 불가능
+```
+@Transactional(readOnly = true)
+	public User 회원찾기(String username) {
+		User user = userRepository.findByUsername(username).orElseGet(()->{
+			return new User();
+		});
+		return user;
+}
+
+@Transactional
+	public void 회원수정(User user) {
+		//수정시에는 영속성 컨텍스트 User 오브젝트를 영속화시키고, 영속화된 User 오브젝트를 수정
+		//select를 해서 User오브젝트를 Db로 부터 가져오는 이유는 영속화를 하기 위해서
+		// 영속화된 오브젝트를 변경하면 DB에 Update문을 날려주기때문	
+		User persistance = userRepository.findById(user.getId()).orElseThrow(()->{
+			return new IllegalArgumentException("회원 찾기 실패");
+		});
+		
+		// oauth에 값이 없으면 수정 가능
+		// Validate 체크, 카카오 로그인 한 사람들은 비밀번호를 변경 못 하게끔 해야함
+		if(persistance.getOauth()==null || persistance.getOauth().equals("")) {
+			String rawPassword = user.getPassword();
+			String encPassword = encoder.encode(rawPassword);
+			persistance.setPassword(encPassword);
+			persistance.setEmail(user.getEmail());
+		}
+		
+		//회원수정 함수 종료시 = 서비스 종료시 = 트랜잭션 종료 = commit이 자동으로 됨
+		//영속화된 persistance객체의 변화가 감지되면 더티체킹이 되어 update문을 날려준다.
+
+		}
+```
+
 
