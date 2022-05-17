@@ -2102,5 +2102,211 @@ public class KakaoProfile {
 
 		}
 ```
+	* 댓글 디자인
+- detail.jsp에 코드추가
+```
+<div class="card">
+		<form>
+			<input type="hidden" id="userId" value="${principal.user.id}" /> <input type="hidden" id="boardId" value="${board.id}" />
+			<div class="card-body">
+				<textarea id="reply-content" class="form-control" rows="1"></textarea>
+			</div>
+			<div class="card-footer">
+				<button type="button" id="btn-reply-save" class="btn btn-primary">등록</button>
+			</div>
+		</form>
+	</div>
+	<br />
+	<div class="card">
+		<div class="card-header">댓글 리스트</div>
+		<ul id="reply-box" class="list-group">
+			<c:forEach var="reply" items="${board.replys }">
+				<li id="reply-${reply.id }" class="list-group-item d-flex justify-content-between">
+					<div>${reply.content }</div>
+					<div class="d-flex">
+						<div class="font-italic">작성자 : ${reply.user.username} &nbsp;</div>
+						<c:if test="${reply.user.id == principal.user.id}">
+							<button onClick="index.replyDelete(${board.id}, ${reply.id})" class="badge">삭제</button>
+						</c:if>
+					</div>
+				</li>
+			</c:forEach>
+		</ul>
+	</div>
+```
+	* ReplyRepository 생성
+```
+package com.cos.blog.repository;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+
+import com.cos.blog.model.Reply;
+
+public interface ReplyRepository extends JpaRepository<Reply, Integer> {
+	
+//	인터페이스 안에서는 퍼블릭 없어도 됨
+	//생성자 호출시 query수행됨
+	@Modifying
+	@Query(value="INSERT INTO reply(userId, boardId, content, createDate) VALUES(?1, ?2, ?3, now())", nativeQuery = true)
+	int mSave(int userId, int boardId, String content); //업데이트된 행의 개수를 리턴해줌.
+}
+
+```
+- Board를 Select하면 EAGER 전략에 의해 replys가 자동으로 가져와진다. 여기서 Reply는 Board를 들고 있는데, 무한 참조가 일어난다. 그래서 Board 안에서 @JsonIgnoreProperties를 걸어준다.
+```
+	//만약 댓글 불러오기 기능을 하나 만들고 누르면 댓글을 불러온다면, EAGER방식으로 댓글버튼 하나는 꼭 가져온다.
+	@OneToMany(mappedBy="board",fetch=FetchType.EAGER, cascade = CascadeType.REMOVE) //보드를 지울 때 댓글을 다 지움
+	@JsonIgnoreProperties({"board"}) //Reply에서 호출을 또 하게 될 때 board는 getter호출이 안 된다 => 무한참조 방지
+	@OrderBy("id desc")//아이디 값으로 내림차순 정렬해줌
+	private List<Reply>replys;
+```
+
+	* 댓글 작성하기
+- board.js
+```
+$("#btn-reply-save").on("click",()=>{ //function(){} , ()=>{} this를 바인딩하기 위해서
+			this.replySave();
+		});
+replySave:function(){
+		let data = {
+			userId: $("#userId").val(),
+			boardId: $("#boardId").val(),
+			content: $("#reply-content").val()
+		};
+		//console.log("boardId :  "+ data.boardId, "data.content:"+ data.content);
+		//let boardId= $("#boardId").val();
+		//let userId = $("#userId").val();
+		
+		$.ajax({
+			type: "POST",
+			url: '/api/board/'+data.boardId+'/reply',
+			data:JSON.stringify(data),
+			contentType:"application/json; charset=utf-8", //body데이터가 어떤 타입인지
+			dataType:"json" 
+		}).done(function(resp){
+			alert("댓글작성이 완료되었습니다.");
+			location.href = '/board/'+data.boardId;
+		}).fail(function(error){
+			alert(JSON.stringify(error));
+		}); 
+
+	}
+```
+
+- BoardApiController 추가
+```
+@PostMapping("/api/board/{boardId}/reply")
+	public ResponseDto<Integer> replySave(@RequestBody ReplySaveRequestDto replySaveRequestDto ) {
+		
+		// 데이터를 받을 때 컨트롤러에서 dto를 만들어서 받는게 좋다.
+		boardService.댓글쓰기(replySaveRequestDto);
+		return new ResponseDto<Integer>(HttpStatus.OK.value(), 1); 
+		
+	}
+```
+- BoardService 추가
+```
+@Autowired
+	private UserRepository userRepository;
+
+@Transactional
+	public void 댓글쓰기(ReplySaveRequestDto replySaveRequestDto  ) {
+		replyRepository.mSave(replySaveRequestDto.getUserId(), replySaveRequestDto.getBoardId(), replySaveRequestDto.getContent());
+		
+	}
+```
+- 댓글 작성시 DTO 사용 (ReplySaveRequestDto 생성)
+![image](https://user-images.githubusercontent.com/86938974/168825218-0a5f25cf-36a4-455e-9215-6545d8633e7b.png)
+```
+package com.cos.blog.dto;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
+public class ReplySaveRequestDto {
+	private int userId;
+	private int boardId;
+	private String content;
+}
+
+```
+	* 댓글 삭제하기
+- board.js
+```
+replyDelete:function(boardId, replyId){
+	
+		$.ajax({
+			type: "DELETE",
+			url: '/api/board/'+boardId+'/reply/'+replyId,
+			dataType:"json" 
+		}).done(function(resp){
+			alert("댓글삭제 성공");
+			location.href = '/board/'+boardId;
+		}).fail(function(error){
+			alert(JSON.stringify(error));
+		}); 
+
+	},
+```
+- BoardApiController 추가
+```
+@DeleteMapping("/api/board/{boardId}/reply/{replyId}")
+	public ResponseDto<Integer> replyDelete(@PathVariable int replyId){
+		boardService.댓글삭제(replyId);
+		return new ResponseDto<Integer>(HttpStatus.OK.value(), 1);
+	}
+```
+- BoardService
+```
+@Transactional
+	public void 댓글삭제(int replyId) {
+		replyRepository.deleteById(replyId);
+	}
+```
+
+
+* 구현
+	* 카카오 로그인
+![image](https://user-images.githubusercontent.com/86938974/168829172-5fac36e2-0c04-4e73-88bc-edc3a73bb069.png)
+
+![image](https://user-images.githubusercontent.com/86938974/168829381-e4b8f367-48a7-4816-8481-43ac22245641.png)
+
+	* 카카오 로그인 성공
+![image](https://user-images.githubusercontent.com/86938974/168829518-19fb2dc0-e5dc-46db-95be-70ba0f4b9698.png)
+
+	* 글 쓰기
+![image](https://user-images.githubusercontent.com/86938974/168829902-2cf3e4fd-4345-432e-a78a-feb89050eb8c.png)
+![image](https://user-images.githubusercontent.com/86938974/168829965-c3c5bd62-992f-4184-b753-ad9aa2332647.png)
+![image](https://user-images.githubusercontent.com/86938974/168830049-f611fd03-de36-4ba8-817d-b0f4491b8c55.png)
+
+	* 댓글 쓰기
+![image](https://user-images.githubusercontent.com/86938974/168830117-92431189-570c-4ea5-8851-bf65add29b0c.png)
+![image](https://user-images.githubusercontent.com/86938974/168830156-66ade122-f688-4f26-9cab-40b01cac7421.png)
+	* 댓글 삭제
+![image](https://user-images.githubusercontent.com/86938974/168830275-a05c0397-3f52-4a03-9fc3-17ca89709151.png)
+![image](https://user-images.githubusercontent.com/86938974/168830327-8ee70ab0-d643-4432-b635-f9237d934802.png)
+	* 글 수정
+![image](https://user-images.githubusercontent.com/86938974/168830452-88cfe33e-42f4-4702-8c80-35b99c00179d.png)
+![image](https://user-images.githubusercontent.com/86938974/168830524-db88eb60-63fa-475b-9564-ed97e7bf05c7.png)
+![image](https://user-images.githubusercontent.com/86938974/168830599-b34a5000-c7fa-49d5-ab91-ee59c043e54b.png)
+	* 글 삭제
+![image](https://user-images.githubusercontent.com/86938974/168830658-3048a752-6c31-4d92-9319-b686f7f6aa4d.png)
+![image](https://user-images.githubusercontent.com/86938974/168830684-32c451b3-db76-4181-98b8-016bb1db48c2.png)
+	* 다른 회원 댓글 삭제 불가능(버튼 나오지 않음)
+![image](https://user-images.githubusercontent.com/86938974/168830875-c3bef9b9-6fea-4687-bedf-7e091cc12851.png)
+	* 다른 회원 글 삭제 불가능, 수정 불가능
+![image](https://user-images.githubusercontent.com/86938974/168830993-22d79642-1b51-4ef2-b22e-47945d39bed0.png)
+	* MySQL 데이터베이스 확인
+![image](https://user-images.githubusercontent.com/86938974/168831301-c2acba5c-19a5-4f35-9b46-317a720aadd7.png)
+![image](https://user-images.githubusercontent.com/86938974/168831357-fde1f85b-9236-41a2-be0b-64fbfec316a2.png)
+![image](https://user-images.githubusercontent.com/86938974/168831401-18215fd8-218f-4f3f-8bfe-6876a4b51e36.png)
+
+
 
 
