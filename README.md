@@ -2280,6 +2280,15 @@ replyDelete:function(boardId, replyId){
 	* 카카오 로그인 성공
 ![image](https://user-images.githubusercontent.com/86938974/168829518-19fb2dc0-e5dc-46db-95be-70ba0f4b9698.png)
 
+	* 회원 가입
+![image](https://user-images.githubusercontent.com/86938974/168832430-a7c8e0f1-87c5-4d4e-9879-9216c02d72b8.png)
+	* 회원이 DB에 들어옴
+![image](https://user-images.githubusercontent.com/86938974/168832614-58b51369-ce91-466c-b96d-cca55c9378ed.png)
+	* 회원 정보 수정
+![image](https://user-images.githubusercontent.com/86938974/168832918-ce0c6c80-279e-43fd-b62b-5f7162b604ff.png)
+	* 비밀번호 수정 가능
+![image](https://user-images.githubusercontent.com/86938974/168833307-dae00ea2-ae26-48a5-b780-44b6ec3f16a1.png)
+
 	* 글 쓰기
 ![image](https://user-images.githubusercontent.com/86938974/168829902-2cf3e4fd-4345-432e-a78a-feb89050eb8c.png)
 ![image](https://user-images.githubusercontent.com/86938974/168829965-c3c5bd62-992f-4184-b753-ad9aa2332647.png)
