@@ -1,4 +1,26 @@
 # Springboot-JPA-Blog
+* 기능
+	* 회원가입
+	* 로그인
+	* 글 쓰기/수정/삭제/상세보기
+	* 글 목록 보기
+	* 인증
+	* 회원정보 수정
+	* 페이징
+	* 댓글 달기
+	* 댓글 삭제
+* 사용 기술
+	* 백엔드 
+		* SpringBoot-JPA (연관관계 매핑과 테이블 생성)
+		* MySQL - Spring 연결
+		* Ajax-Json 데이터 통신
+		* Spring Security 사용 로그인 페이지 커스터마이징, 비밀번호 해쉬 후 회원가입
+	* 프론트엔드
+		* Html/css
+		* Bootstrap
+	* 화면 구성
+		* jsp
+	* OAuth2.0  
 
 * 환경세팅
 	- Oracle JDK 1.8
