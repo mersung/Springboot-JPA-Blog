@@ -24,6 +24,12 @@
 		* jsp
 	* OAuth2.0  
 
+* ERD
+
+![image](https://user-images.githubusercontent.com/86938974/170266340-4a5b549a-a424-43bc-b274-e7f3b818a92b.png)
+
+	
+
 * 환경세팅
 	- Oracle JDK 1.8
 	- MySQL 5.7
