@@ -695,9 +695,7 @@ model.addAttribute에서 설정한 boards가 넘어온다.
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
 <br />
 <div class="jumbotron text-center" style="margin-bottom: 0">
-	<p>Created by 심대성</p>
-	<p>📞 010-4799-5309</p>
-	<p>🏴 인천광역시 서구 가정동</p>
+
 </div>
 </body>
 </html>
@@ -716,8 +714,7 @@ model.addAttribute에서 설정한 boards가 넘어온다.
 
 <!DOCTYPE html>
 <html lang="en">
-<head>
-<title>심대성의 스프링부트 블로그</title>
+
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.1/dist/css/bootstrap.min.css">
